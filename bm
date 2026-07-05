@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+case "$1" in
+    start)
+        ./scripts/start.sh
+        ;;
+    stop)
+        ./scripts/stop.sh
+        ;;
+    restart)
+        ./scripts/restart.sh
+        ;;
+    status)
+        docker compose ps
+        ;;
+    doctor)
+        ./scripts/doctor.sh
+        ;;
+    health)
+        ./scripts/healthcheck.sh
+        ;;
+    backup)
+        ./scripts/backup.sh
+        ;;
+    restore)
+        shift
+        ./scripts/restore.sh "$@"
+        ;;
+    logs)
+        ./scripts/logs.sh
+        ;;
+    cleanup)
+        ./scripts/cleanup.sh
+        ;;
+    update)
+        ./scripts/update.sh
+        ;;
+    install)
+        ./scripts/install.sh
+        ;;
+    install-gpu)
+        ./scripts/install-gpu.sh
+        ;;
+    *)
+        echo "=================================="
+        echo " BookMind Development Environment"
+        echo "=================================="
+        echo
+        echo "Kullanım:"
+        echo "  ./bm start"
+        echo "  ./bm stop"
+        echo "  ./bm restart"
+        echo "  ./bm status"
+        echo "  ./bm doctor"
+        echo "  ./bm health"
+        echo "  ./bm backup"
+        echo "  ./bm restore <backup>"
+        echo "  ./bm logs"
+        echo "  ./bm cleanup"
+        echo "  ./bm update"
+        echo "  ./bm install"
+        echo "  ./bm install-gpu"
+        exit 1
+        ;;
+esac
