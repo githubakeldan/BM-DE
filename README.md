@@ -125,3 +125,19 @@ Aşağıdaki servisler daha sonraki sürümlerde eklenecektir:
 Bu depo BookMind geliştirme ortamıdır.
 
 © 2026 BookMind Project
+## BM CLI
+
+```bash
+./bm start
+./bm stop
+./bm restart
+./bm status
+./bm doctor
+./bm health
+./bm backup
+./bm restore <backup>
+./bm logs
+./bm cleanup
+./bm update
+./bm version
+```
