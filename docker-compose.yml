@@ -1,496 +1,135 @@
-# =============================================================================
-# BM-DE v1.0.0 RC1
-# Production Docker Compose
-#
-# Project : BookMind Development Environment
-# Version : 1.0.0 RC1
-#
-# =============================================================================
-
 name: bm-de
 
 services:
 
-# =============================================================================
-# OLLAMA
-# =============================================================================
-
   ollama:
     image: ollama/ollama:0.11.7
     container_name: bm-ollama
-
     restart: unless-stopped
-
-    networks:
-      - bm-network
-
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"
-
+      - "11434:11434"
     volumes:
       - bm-ollama:/root/.ollama
-
     environment:
       OLLAMA_KEEP_ALIVE: 24h
       OLLAMA_NUM_PARALLEL: 2
       OLLAMA_MAX_LOADED_MODELS: 2
-      OLLAMA_FLASH_ATTENTION: 1
-
+      OLLAMA_FLASH_ATTENTION: "1"
+    networks:
+      - bm-network
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities:
-                - gpu
+  postgres:
+    image: postgres:17
+    container_name: bm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Europe/Istanbul
+    ports:
+      - "5432:5432"
+    volumes:
+      - bm-postgres:/var/lib/postgresql/data
+    networks:
+      - bm-network
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
-# =============================================================================
-# OPEN WEBUI
-# =============================================================================
+  redis:
+    image: redis:8-alpine
+    container_name: bm-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - bm-redis:/data
+    networks:
+      - bm-network
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.5
+    container_name: bm-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - bm-qdrant:/qdrant/storage
+    networks:
+      - bm-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
-
     container_name: bm-open-webui
-
     restart: unless-stopped
-
-    depends_on:
-      ollama:
-        condition: service_healthy
-
-    networks:
-      - bm-network
-
     ports:
-      - "${OPENWEBUI_PORT:-3000}:8080"
-
+      - "3000:8080"
     volumes:
       - bm-open-webui:/app/backend/data
-
     environment:
-
       OLLAMA_BASE_URL: http://ollama:11434
-
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
-
       ENABLE_SIGNUP: "false"
-
-      DEFAULT_USER_ROLE: user
-
-      ENABLE_COMMUNITY_SHARING: "false"
-
-      ENABLE_MODEL_FILTER: "true"
-
-      ENABLE_WEB_SEARCH: "false"
-
-      ENABLE_IMAGE_GENERATION: "false"
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8080/health"
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-# =============================================================================
-# POSTGRESQL
-# =============================================================================
-
-  postgres:
-
-    image: postgres:17
-
-    container_name: bm-postgres
-
-    restart: unless-stopped
-
-    networks:
-      - bm-network
-
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-
-    volumes:
-      - bm-postgres:/var/lib/postgresql/data
-
-    environment:
-
-      POSTGRES_DB: ${POSTGRES_DB}
-
-      POSTGRES_USER: ${POSTGRES_USER}
-
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-
-      TZ: Europe/Istanbul
-
-      PGTZ: Europe/Istanbul
-
-    healthcheck:
-
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
-        ]
-
-      interval: 15s
-
-      timeout: 5s
-
-      retries: 10
-# =============================================================================
-# REDIS
-# =============================================================================
-
-  redis:
-
-    image: redis:8-alpine
-
-    container_name: bm-redis
-
-    restart: unless-stopped
-
-    command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --save
-      - "60"
-      - "1000"
-
-    networks:
-      - bm-network
-
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-
-    volumes:
-      - bm-redis:/data
-
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-
-# =============================================================================
-# QDRANT
-# =============================================================================
-
-  qdrant:
-
-    image: qdrant/qdrant:v1.15.5
-
-    container_name: bm-qdrant
-
-    restart: unless-stopped
-
     depends_on:
-      postgres:
-        condition: service_healthy
-
-      redis:
-        condition: service_healthy
-
-    networks:
-      - bm-network
-
-    ports:
-      - "${QDRANT_HTTP_PORT:-6333}:6333"
-      - "${QDRANT_GRPC_PORT:-6334}:6334"
-
-    volumes:
-      - bm-qdrant:/qdrant/storage
-
-    environment:
-
-      QDRANT__SERVICE__HTTP_PORT: 6333
-
-      QDRANT__SERVICE__GRPC_PORT: 6334
-
-      QDRANT__LOG_LEVEL: INFO
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:6333/readyz"
-        ]
-      interval: 20s
-      timeout: 5s
-      retries: 10
-
-# =============================================================================
-# N8N
-# =============================================================================
-
-  n8n:
-
-    image: docker.n8n.io/n8nio/n8n:1.102.4
-
-    container_name: bm-n8n
-
-    restart: unless-stopped
-
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-      redis:
-        condition: service_healthy
-
-    networks:
-      - bm-network
-
-    ports:
-      - "${N8N_PORT:-5678}:5678"
-
-    volumes:
-      - bm-n8n:/home/node/.n8n
-
-    environment:
-
-      TZ: Europe/Istanbul
-
-      DB_TYPE: postgresdb
-
-      DB_POSTGRESDB_HOST: postgres
-
-      DB_POSTGRESDB_PORT: 5432
-
-      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
-
-      DB_POSTGRESDB_USER: ${POSTGRES_USER}
-
-      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
-
-      N8N_HOST: ${N8N_HOST}
-
-      N8N_PORT: 5678
-
-      N8N_PROTOCOL: http
-
-      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
-
-      GENERIC_TIMEZONE: Europe/Istanbul
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:5678/healthz"
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-# =============================================================================
-# BM-CORE
-# =============================================================================
-
-  bm-core:
-
-    container_name: bm-core
-
-    build:
-      context: ./services/bm-core
-      dockerfile: Dockerfile
-
-    restart: unless-stopped
-
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-      redis:
-        condition: service_healthy
-
-      qdrant:
-        condition: service_healthy
-
       ollama:
         condition: service_healthy
-
-    env_file:
-      - .env
-
     networks:
       - bm-network
 
-    expose:
-      - "8000"
-
-# =============================================================================
-# BM-LEARN
-# =============================================================================
-
-  bm-learn:
-
-    container_name: bm-learn
-
-    build:
-      context: ./services/bm-learn
-      dockerfile: Dockerfile
-
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:1.102.4
+    container_name: bm-n8n
     restart: unless-stopped
-
-    depends_on:
-      bm-core:
-        condition: service_started
-
-    env_file:
-      - .env
-
-    networks:
-      - bm-network
-
-    expose:
-      - "8001"
-
-# =============================================================================
-# BM-AGENT
-# =============================================================================
-
-  bm-agent:
-
-    container_name: bm-agent
-
-    build:
-      context: ./services/bm-agent
-      dockerfile: Dockerfile
-
-    restart: unless-stopped
-
-    depends_on:
-      bm-core:
-        condition: service_started
-
-    env_file:
-      - .env
-
-    networks:
-      - bm-network
-
-    expose:
-      - "8002"
-
-# =============================================================================
-# BM-RAG
-# =============================================================================
-
-  bm-rag:
-
-    container_name: bm-rag
-
-    build:
-      context: ./services/bm-rag
-      dockerfile: Dockerfile
-
-    restart: unless-stopped
-
-    depends_on:
-      bm-core:
-        condition: service_started
-
-      qdrant:
-        condition: service_healthy
-
-    env_file:
-      - .env
-
-    networks:
-      - bm-network
-
-    expose:
-      - "8003"
-
-# =============================================================================
-# BM-CONSOLE
-# =============================================================================
-
-  bm-console:
-
-    container_name: bm-console
-
-    build:
-      context: ./services/bm-console
-      dockerfile: Dockerfile
-
-    restart: unless-stopped
-
-    depends_on:
-      bm-core:
-        condition: service_started
-
-    env_file:
-      - .env
-
-    networks:
-      - bm-network
-
     ports:
-      - "${BM_CONSOLE_PORT:-8088}:8080"
-# =============================================================================
-# NETWORKS
-# =============================================================================
+      - "5678:5678"
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_HOST: ${N8N_HOST}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      GENERIC_TIMEZONE: Europe/Istanbul
+    volumes:
+      - bm-n8n:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bm-network
 
 networks:
-
   bm-network:
-
-    name: bm-network
-
     driver: bridge
 
-# =============================================================================
-# VOLUMES
-# =============================================================================
-
 volumes:
-
   bm-ollama:
-
-    name: bm-ollama
-
   bm-open-webui:
-
-    name: bm-open-webui
-
   bm-postgres:
-
-    name: bm-postgres
-
   bm-redis:
-
-    name: bm-redis
-
   bm-qdrant:
-
-    name: bm-qdrant
-
   bm-n8n:
-
-    name: bm-n8n
