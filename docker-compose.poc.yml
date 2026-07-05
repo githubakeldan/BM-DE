@@ -1,0 +1,16 @@
+name: bm-de
+
+services:
+
+networks:
+  bm-network:
+    name: bm-network
+    driver: bridge
+
+volumes:
+  bm-open-webui:
+  bm-postgres:
+  bm-redis:
+  bm-qdrant:
+  bm-n8n:
+  bm-ollama:

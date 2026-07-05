@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Logs
+logs/
+
+# Backups
+backups/
+
+# Runtime data
+volumes/
+
+# Python
+__pycache__/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
